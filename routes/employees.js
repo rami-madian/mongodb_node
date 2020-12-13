@@ -3,6 +3,9 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const Employee = require('../model/employee');
 const json2csv = require('json2csv').parse;
+const fs = require('fs');
+const path = require('path');
+const moment = require('moment');
 
 
 const dbConnect = async () => {
@@ -18,8 +21,10 @@ const exportData = async (data, res) => {
   let csv;
   const fields = ['firstname', 'lastname', 'age', 'email', 'company.name'];
   try {
-    csv = json2csv(data, { fields })
-    return res.send(Buffer.from(csv))
+    csv = json2csv(data, { fields });
+    const filePath = path.join(__dirname, '..', 'exports', `${moment().unix()}.csv`);
+    fs.writeFileSync(filePath, csv)
+    return res.download(filePath);
   } catch (e) {
     return res.status(500).json({ e });
   }
