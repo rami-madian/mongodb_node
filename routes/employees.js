@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const Employee = require('../model/employee');
+const json2csv = require('json2csv').parse;
+
 
 const dbConnect = async () => {
   await mongoose.connect('mongodb://localhost/Test', {
@@ -12,19 +14,50 @@ const dbConnect = async () => {
   });
 }
 
+const exportData = async (data, res) => {
+  let csv;
+  const fields = ['firstname', 'lastname', 'age', 'email', 'company.name'];
+  try {
+    csv = json2csv(data, { fields })
+    return res.send(Buffer.from(csv))
+  } catch (e) {
+    return res.status(500).json({ e });
+  }
+}
+
+router.get('/count', async (req, res) => {
+  await dbConnect();
+  const list = await Employee.find({});
+  return res.json(list.length);
+});
+
+
+
 //Retrieve all employees.
 router.get('/', async (req, res) => {
   await dbConnect();
   let list;
-  if (req.query && req.query.companysize) {
-    list = await Employee.find({'company.size': req.query.companysize});
-  } else if (req.query && req.query.location) {
-    list = await Employee.find({'company.location': req.query.location});
-  } else {
-    list = await Employee.find({});
-  }
+  const pageSize = 10;
+  const page = Math.max(0, req.query ? req.query.page : 0);
 
-  return res.json(list);
+  if (req.query && req.query.companysize) {
+    list = await Employee.find({'company.size': req.query.companysize})
+        .sort( { firstname: 'asc' } )
+        .limit(pageSize).skip(page);
+  } else if (req.query && req.query.location) {
+    list = await Employee.find({'company.location': req.query.location})
+        .sort( { firstname: 'asc' } )
+        .limit(pageSize).skip(page);
+  } else {
+    list = await Employee.find({})
+        .sort( { firstname: 'asc' } )
+        .limit(pageSize).skip(page);
+  }
+  if (req.query && req.query.export) {
+      return exportData(list, res);
+  } else {
+    return res.json(list);
+  }
 });
 
 //Create an employee.
